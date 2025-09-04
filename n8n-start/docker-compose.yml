@@ -21,6 +21,9 @@ x-shared: &shared
     - N8N_ENCRYPTION_KEY=${ENCRYPTION_KEY}
     - N8N_DEFAULT_LOCALE=zh-CN
     - N8N_SECURE_COOKIE=false
+    - WEBHOOK_URL=${WEBHOOK_URL}
+    - N8N_HOST=${N8N_HOST}
+    - N8N_PROTOCOL=${N8N_PROTOCOL}
   links:
     - postgres
     - redis

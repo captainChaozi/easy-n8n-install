@@ -67,6 +67,10 @@ get_public_ip() {
 
 # 创建.env文件
 create_env_file() {
+    local domain_name="$1"
+    local use_https="$2"
+    local public_ip="$3"
+    
     print_info "正在生成环境变量文件..."
     
     # 生成随机密码和加密密钥
@@ -80,6 +84,27 @@ create_env_file() {
     sed -i "s/REPLACE_POSTGRES_PASSWORD/$postgres_password/g" n8n-start/.env
     sed -i "s/REPLACE_NON_ROOT_PASSWORD/$non_root_password/g" n8n-start/.env
     sed -i "s/REPLACE_ENCRYPTION_KEY/$encryption_key/g" n8n-start/.env
+    
+    # 根据配置添加N8N相关环境变量
+    if [[ -n "$domain_name" ]]; then
+        # 使用域名
+        if [[ "$use_https" == "true" ]]; then
+            # HTTPS配置
+            echo "WEBHOOK_URL=https://$domain_name" >> n8n-start/.env
+            echo "N8N_HOST=$domain_name" >> n8n-start/.env
+            echo "N8N_PROTOCOL=https" >> n8n-start/.env
+        else
+            # HTTP配置
+            echo "WEBHOOK_URL=http://$domain_name" >> n8n-start/.env
+            echo "N8N_HOST=$domain_name" >> n8n-start/.env
+            echo "N8N_PROTOCOL=http" >> n8n-start/.env
+        fi
+    else
+        # 使用IP地址
+        echo "WEBHOOK_URL=http://$public_ip:5678" >> n8n-start/.env
+        echo "N8N_HOST=$public_ip" >> n8n-start/.env
+        echo "N8N_PROTOCOL=http" >> n8n-start/.env
+    fi
     
     print_success "环境变量文件已生成"
 }
@@ -219,22 +244,13 @@ main() {
         exit 1
     fi
     
-    # 步骤1: 创建环境变量文件
-    create_env_file
-    
-    # 步骤2: 启动N8N
-    if ! start_n8n; then
-        exit 1
-    fi
-    
-    # 获取访问地址
+    # 获取公网IP
     local public_ip=$(get_public_ip)
     local n8n_port="5678"
+    local domain_name=""
+    local use_https="false"
     
-    print_success "N8N已成功启动！"
-    echo -e "${GREEN}访问地址: http://${public_ip}:${n8n_port}${NC}"
-    
-    # 步骤3: 询问是否需要配置域名
+    # 步骤1: 询问是否需要配置域名
     echo ""
     while true; do
         read -p "是否需要配置域名代理？(y/n): " setup_domain
@@ -246,46 +262,61 @@ main() {
     done
     
     if [[ "$setup_domain" =~ ^[Yy]$ ]]; then
-        # 步骤4: 启动nginx
-        setup_nginx
-        
         echo ""
         read -p "请输入您的域名 (例如: example.com): " domain_name
         
         if [[ -n "$domain_name" ]]; then
-            # 更新nginx配置文件中的server_name
-            print_info "正在更新nginx配置文件..."
-            sed -i "s/server_name localhost;/server_name $domain_name;/g" /root/nginx/80.conf
-            
-            # 重启nginx容器以应用新配置
-            docker restart gateway
-            
-            print_success "域名配置完成！"
-            echo -e "${GREEN}HTTP访问地址: http://${domain_name}${NC}"
-            
-            # 步骤5: 询问是否配置HTTPS
+            # 步骤2: 询问是否配置HTTPS
             echo ""
             while true; do
                 read -p "是否需要配置HTTPS证书？(y/n): " setup_https
                 case $setup_https in
-                    [Yy]* ) break;;
-                    [Nn]* ) break;;
+                    [Yy]* ) use_https="true"; break;;
+                    [Nn]* ) use_https="false"; break;;
                     * ) print_warning "请输入 y 或 n";;
                 esac
             done
+        fi
+    fi
+    
+    # 步骤3: 创建环境变量文件（现在包含所有配置信息）
+    create_env_file "$domain_name" "$use_https" "$public_ip"
+    
+    # 步骤4: 启动N8N
+    if ! start_n8n; then
+        exit 1
+    fi
+    
+    print_success "N8N已成功启动！"
+    
+    # 步骤5: 配置nginx和SSL（如果需要）
+    if [[ "$setup_domain" =~ ^[Yy]$ ]] && [[ -n "$domain_name" ]]; then
+        # 启动nginx
+        setup_nginx
+        
+        # 更新nginx配置文件中的server_name
+        print_info "正在更新nginx配置文件..."
+        sed -i "s/server_name localhost;/server_name $domain_name;/g" /root/nginx/80.conf
+        
+        # 重启nginx容器以应用新配置
+        docker restart gateway
+        
+        print_success "域名配置完成！"
+        
+        if [[ "$use_https" == "true" ]]; then
+            # 复制HTTPS配置文件
+            print_info "正在配置HTTPS..."
+            cp nginx/443.conf /root/nginx/
+            sed -i "s/server_name localhost;/server_name $domain_name;/g" /root/nginx/443.conf
             
-            if [[ "$setup_https" =~ ^[Yy]$ ]]; then
-                # 复制HTTPS配置文件
-                print_info "正在配置HTTPS..."
-                cp nginx/443.conf /root/nginx/
-                sed -i "s/server_name localhost;/server_name $domain_name;/g" /root/nginx/443.conf
-                
-                if setup_ssl; then
-                    echo -e "${GREEN}HTTPS访问地址: https://${domain_name}${NC}"
-                else
-                    print_warning "SSL配置失败，您仍可以使用HTTP访问"
-                fi
+            if setup_ssl; then
+                echo -e "${GREEN}HTTPS访问地址: https://${domain_name}${NC}"
+            else
+                print_warning "SSL配置失败，您仍可以使用HTTP访问"
+                echo -e "${GREEN}HTTP访问地址: http://${domain_name}${NC}"
             fi
+        else
+            echo -e "${GREEN}HTTP访问地址: http://${domain_name}${NC}"
         fi
     else
         print_info "脚本执行完成"
