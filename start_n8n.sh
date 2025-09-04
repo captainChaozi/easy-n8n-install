@@ -230,7 +230,7 @@ main() {
             if [[ "$setup_https" =~ ^[Yy]$ ]]; then
                 # 复制HTTPS配置文件
                 print_info "正在配置HTTPS..."
-                cp ../nginx/443.conf /root/nginx/
+                cp nginx/443.conf /root/nginx/
                 sed -i "s/server_name localhost;/server_name $domain_name;/g" /root/nginx/443.conf
                 
                 if setup_ssl; then
