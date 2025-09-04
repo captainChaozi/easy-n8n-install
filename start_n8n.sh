@@ -129,24 +129,63 @@ setup_nginx() {
 
 # 配置SSL证书
 setup_ssl() {
-    print_info "请提供SSL证书文件路径："
+    print_info "请粘贴SSL证书内容："
+    print_warning "粘贴完成后，在新行输入 'END' 并按回车结束"
+    echo ""
+    echo "请粘贴证书内容（包含 -----BEGIN CERTIFICATE----- 和 -----END CERTIFICATE-----）："
     
-    read -p "请输入证书文件(.crt)的完整路径: " cert_path
-    read -p "请输入私钥文件(.key)的完整路径: " key_path
+    local cert_content=""
+    local line=""
+    while IFS= read -r line; do
+        if [[ "$line" == "END" ]]; then
+            break
+        fi
+        cert_content+="$line"$'\n'
+    done
     
-    if [[ ! -f "$cert_path" ]]; then
-        print_error "证书文件不存在: $cert_path"
+    if [[ -z "$cert_content" ]]; then
+        print_error "证书内容为空"
         return 1
     fi
     
-    if [[ ! -f "$key_path" ]]; then
-        print_error "私钥文件不存在: $key_path"
+    echo ""
+    print_info "请粘贴私钥内容："
+    print_warning "粘贴完成后，在新行输入 'END' 并按回车结束"
+    echo ""
+    echo "请粘贴私钥内容（包含 -----BEGIN PRIVATE KEY----- 和 -----END PRIVATE KEY-----）："
+    
+    local key_content=""
+    while IFS= read -r line; do
+        if [[ "$line" == "END" ]]; then
+            break
+        fi
+        key_content+="$line"$'\n'
+    done
+    
+    if [[ -z "$key_content" ]]; then
+        print_error "私钥内容为空"
         return 1
     fi
     
-    # 复制证书文件
-    cp "$cert_path" /root/nginx/cert/cert.crt
-    cp "$key_path" /root/nginx/cert/cert.key
+    # 验证证书格式
+    if ! echo "$cert_content" | openssl x509 -noout 2>/dev/null; then
+        print_error "证书格式无效"
+        return 1
+    fi
+    
+    # 验证私钥格式
+    if ! echo "$key_content" | openssl rsa -noout 2>/dev/null && ! echo "$key_content" | openssl ec -noout 2>/dev/null; then
+        print_error "私钥格式无效"
+        return 1
+    fi
+    
+    # 保存证书文件
+    echo "$cert_content" > /root/nginx/cert/cert.crt
+    echo "$key_content" > /root/nginx/cert/cert.key
+    
+    # 设置正确的权限
+    chmod 644 /root/nginx/cert/cert.crt
+    chmod 600 /root/nginx/cert/cert.key
     
     # 重启nginx
     docker restart gateway

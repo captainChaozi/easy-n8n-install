@@ -255,19 +255,60 @@ show_menu() {
 # 处理证书更新
 handle_certificate_update() {
     echo ""
-    print_info "请提供新的SSL证书文件路径："
+    print_info "请粘贴SSL证书内容："
+    print_warning "粘贴完成后，在新行输入 'END' 并按回车结束"
+    echo ""
+    echo "请粘贴证书内容（包含 -----BEGIN CERTIFICATE----- 和 -----END CERTIFICATE-----）："
     
-    read -p "请输入证书文件(.crt/.pem)的完整路径: " cert_path
-    read -p "请输入私钥文件(.key)的完整路径: " key_path
+    local cert_content=""
+    local line=""
+    while IFS= read -r line; do
+        if [[ "$line" == "END" ]]; then
+            break
+        fi
+        cert_content+="$line"$'\n'
+    done
+    
+    if [[ -z "$cert_content" ]]; then
+        print_error "证书内容为空"
+        return 1
+    fi
+    
+    echo ""
+    print_info "请粘贴私钥内容："
+    print_warning "粘贴完成后，在新行输入 'END' 并按回车结束"
+    echo ""
+    echo "请粘贴私钥内容（包含 -----BEGIN PRIVATE KEY----- 和 -----END PRIVATE KEY-----）："
+    
+    local key_content=""
+    while IFS= read -r line; do
+        if [[ "$line" == "END" ]]; then
+            break
+        fi
+        key_content+="$line"$'\n'
+    done
+    
+    if [[ -z "$key_content" ]]; then
+        print_error "私钥内容为空"
+        return 1
+    fi
+    
+    # 创建临时文件进行验证
+    local temp_cert=$(mktemp)
+    local temp_key=$(mktemp)
+    
+    echo "$cert_content" > "$temp_cert"
+    echo "$key_content" > "$temp_key"
     
     # 验证证书
-    if ! validate_certificate "$cert_path" "$key_path"; then
+    if ! validate_certificate "$temp_cert" "$temp_key"; then
         print_error "证书验证失败，更新已取消"
+        rm -f "$temp_cert" "$temp_key"
         return 1
     fi
     
     # 显示证书信息
-    show_certificate_info "$cert_path"
+    show_certificate_info "$temp_cert"
     
     # 确认更新
     echo ""
@@ -277,6 +318,7 @@ handle_certificate_update() {
             [Yy]* ) break;;
             [Nn]* ) 
                 print_info "证书更新已取消"
+                rm -f "$temp_cert" "$temp_key"
                 return 0;;
             * ) print_warning "请输入 y 或 n";;
         esac
@@ -286,7 +328,10 @@ handle_certificate_update() {
     backup_existing_certs
     
     # 更新证书
-    update_certificates "$cert_path" "$key_path"
+    update_certificates "$temp_cert" "$temp_key"
+    
+    # 清理临时文件
+    rm -f "$temp_cert" "$temp_key"
     
     # 重启nginx
     if restart_nginx; then
