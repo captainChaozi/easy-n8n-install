@@ -119,7 +119,6 @@ setup_nginx() {
     
     # 复制nginx配置文件
     cp ../nginx/80.conf /root/nginx/
-    cp ../nginx/443.conf /root/nginx/
     
     # 启动nginx容器
     cd ..
@@ -210,7 +209,6 @@ main() {
             # 更新nginx配置文件中的server_name
             print_info "正在更新nginx配置文件..."
             sed -i "s/server_name localhost;/server_name $domain_name;/g" /root/nginx/80.conf
-            sed -i "s/server_name localhost;/server_name $domain_name;/g" /root/nginx/443.conf
             
             # 重启nginx容器以应用新配置
             docker restart gateway
@@ -230,6 +228,11 @@ main() {
             done
             
             if [[ "$setup_https" =~ ^[Yy]$ ]]; then
+                # 复制HTTPS配置文件
+                print_info "正在配置HTTPS..."
+                cp ../nginx/443.conf /root/nginx/
+                sed -i "s/server_name localhost;/server_name $domain_name;/g" /root/nginx/443.conf
+                
                 if setup_ssl; then
                     echo -e "${GREEN}HTTPS访问地址: https://${domain_name}${NC}"
                 else
