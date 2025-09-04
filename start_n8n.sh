@@ -130,9 +130,12 @@ setup_nginx() {
 # 配置SSL证书
 setup_ssl() {
     print_info "请粘贴SSL证书内容："
-    print_warning "粘贴完成后，在新行输入 'END' 并按回车结束"
+    echo -e "${YELLOW}操作说明：${NC}"
+    echo "1. 复制完整的证书内容（包含 -----BEGIN 和 -----END 行）"
+    echo "2. 在终端中右键粘贴（或 Ctrl+Shift+V）"
+    echo "3. 粘贴完成后，按回车换行，然后输入 END 再按回车"
     echo ""
-    echo "请粘贴证书内容（包含 -----BEGIN CERTIFICATE----- 和 -----END CERTIFICATE-----）："
+    echo -e "${BLUE}请粘贴证书内容：${NC}"
     
     local cert_content=""
     local line=""
@@ -149,10 +152,15 @@ setup_ssl() {
     fi
     
     echo ""
-    print_info "请粘贴私钥内容："
-    print_warning "粘贴完成后，在新行输入 'END' 并按回车结束"
+    print_success "证书内容已接收"
     echo ""
-    echo "请粘贴私钥内容（包含 -----BEGIN PRIVATE KEY----- 和 -----END PRIVATE KEY-----）："
+    print_info "请粘贴私钥内容："
+    echo -e "${YELLOW}操作说明：${NC}"
+    echo "1. 复制完整的私钥内容（包含 -----BEGIN 和 -----END 行）"
+    echo "2. 在终端中右键粘贴（或 Ctrl+Shift+V）"
+    echo "3. 粘贴完成后，按回车换行，然后输入 END 再按回车"
+    echo ""
+    echo -e "${BLUE}请粘贴私钥内容：${NC}"
     
     local key_content=""
     while IFS= read -r line; do
