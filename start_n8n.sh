@@ -190,7 +190,14 @@ main() {
     
     # 步骤3: 询问是否需要配置域名
     echo ""
-    read -p "是否需要配置域名代理？(y/N): " setup_domain
+    while true; do
+        read -p "是否需要配置域名代理？(y/n): " setup_domain
+        case $setup_domain in
+            [Yy]* ) break;;
+            [Nn]* ) break;;
+            * ) print_warning "请输入 y 或 n";;
+        esac
+    done
     
     if [[ "$setup_domain" =~ ^[Yy]$ ]]; then
         # 步骤4: 启动nginx
@@ -213,7 +220,14 @@ main() {
             
             # 步骤5: 询问是否配置HTTPS
             echo ""
-            read -p "是否需要配置HTTPS证书？(y/N): " setup_https
+            while true; do
+                read -p "是否需要配置HTTPS证书？(y/n): " setup_https
+                case $setup_https in
+                    [Yy]* ) break;;
+                    [Nn]* ) break;;
+                    * ) print_warning "请输入 y 或 n";;
+                esac
+            done
             
             if [[ "$setup_https" =~ ^[Yy]$ ]]; then
                 if setup_ssl; then
